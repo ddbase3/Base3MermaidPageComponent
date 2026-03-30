@@ -17,10 +17,13 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
         }
 
         protected function getDefaultProps(): array {
-                return [];
+                return ['mermaid' => ''];
         }
 
         protected function setFormContent(ilPropertyFormGUI $form, array $props): void {
+		$pageModuleMermaidControl = new ilTextAreaInputGUI('Mermaid', 'mermaid');
+		$pageModuleMermaidControl->setValue($props['mermaid']);
+		$form->addItem($pageModuleMermaidControl);
         }
 
         protected function getPresentationHtml(array $a_properties, string $plugin_version): string {
@@ -34,9 +37,7 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
                 $display = $displays[0];
 
                 // configure and output
-		// $display->setData($a_properties);
-		$data = [ "mermaid" => "flowchart TD\n\tA[Start] --> B{Entscheidung}\n\tB -->|Ja| C[Weiter]\n\tB -->|Nein| D[Abbruch]\n\tC --> E[Ende]\n\tD --> E" ];
-		$display->setData($data);
+		$display->setData($a_properties);
                 return $display->getOutput();
         }
 }
