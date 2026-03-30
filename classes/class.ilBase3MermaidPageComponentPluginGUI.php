@@ -34,7 +34,9 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
                 $display = $displays[0];
 
                 // configure and output
-                $display->setData($a_properties);
+		// $display->setData($a_properties);
+		$data = [ "mermaid" => "flowchart TD\n\tA[Start] --> B{Entscheidung}\n\tB -->|Ja| C[Weiter]\n\tB -->|Nein| D[Abbruch]\n\tC --> E[Ende]\n\tD --> E" ];
+		$display->setData($data);
                 return $display->getOutput();
         }
 }
