@@ -1,260 +1,496 @@
 <?php declare(strict_types=1);
 
-use Base3\Api\IAssetResolver;
 use Base3\Api\IDisplay;
 use Base3\Base3Ilias\PageComponent\AbstractPageComponentPluginGUI;
 
 /**
  * @ilCtrl_isCalledBy ilBase3MermaidPageComponentPluginGUI: ilPCPluggedGUI
  */
-class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGUI
-{
-        protected function getPageComponentName(): string
-        {
-                return 'BASE3 Mermaid';
-        }
+class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGUI {
 
-        protected function getPageComponentDesc(): string
-        {
-                return 'BASE3 Mermaid Page Component';
-        }
+	protected function getPageComponentName(): string {
+		return 'BASE3 Mermaid';
+	}
 
-        protected function getDefaultProps(): array
-        {
-                return [
-                        'mermaid_src' => '',
-                        'mermaid' => '' // Fallback für alte gespeicherte Einträge
-                ];
-        }
+	protected function getPageComponentDesc(): string {
+		return 'BASE3 Mermaid Page Component';
+	}
 
-        protected function setFormContent(ilPropertyFormGUI $form, array $props): void
-        {
-                $this->mainTemplate->addJavaScript('components/Base3/ClientStack/assetloader/assetloader.min.js');
+	protected function getDefaultProps(): array {
+		return [
+			'mermaid_src' => '',
+			'mermaid' => ''
+		];
+	}
 
-                $value = (string) ($props['mermaid_src'] ?? $props['mermaid'] ?? '');
+	protected function setFormContent(ilPropertyFormGUI $form, array $props): void {
+		$this->mainTemplate->addJavaScript('components/Base3/ClientStack/assetloader/assetloader.min.js');
 
-                $mermaid = new ilTextAreaInputGUI('Mermaid', 'mermaid_src');
-                $mermaid->setValue($value);
-                $mermaid->setRows(12);
-                $form->addItem($mermaid);
+		$value = (string) ($props['mermaid_src'] ?? $props['mermaid'] ?? '');
 
-                $preview = new ilCustomInputGUI('Vorschau');
-                $preview->setHtml($this->getMermaidPreviewHtml());
-                $form->addItem($preview);
-        }
+		$mermaid = new ilTextAreaInputGUI('Mermaid Source', 'mermaid_src');
+		$mermaid->setValue($value);
+		$mermaid->setRows(12);
+		$form->addItem($mermaid);
 
-        protected function getPresentationHtml(array $a_properties, string $plugin_version): string
-        {
-                $this->mainTemplate->addJavaScript('components/Base3/ClientStack/assetloader/assetloader.min.js');
+		$editor = new ilCustomInputGUI('Diagram');
+		$editor->setHtml($this->getMermaidEditorHtml());
+		$form->addItem($editor);
+	}
 
-                $displays = $this->classmap->getInstances([
-                        'interface' => IDisplay::class,
-                        'name' => 'mermaiddisplay'
-                ]);
+	protected function getPresentationHtml(array $a_properties, string $plugin_version): string {
+		$this->mainTemplate->addJavaScript('components/Base3/ClientStack/assetloader/assetloader.min.js');
 
-                if (empty($displays)) {
-                        return 'Display not found.';
-                }
+		$displays = $this->classmap->getInstances([
+			'interface' => IDisplay::class,
+			'name' => 'mermaiddisplay'
+		]);
 
-                $display = $displays[0];
-                $display->setData([
-                        'mermaid' => (string) ($a_properties['mermaid_src'] ?? $a_properties['mermaid'] ?? '')
-                ]);
+		if (empty($displays)) {
+			return 'Display not found.';
+		}
 
-                return $display->getOutput();
-        }
+		$display = $displays[0];
+		$display->setData([
+			'mermaid' => (string) ($a_properties['mermaid_src'] ?? $a_properties['mermaid'] ?? '')
+		]);
 
-        protected function getMermaidPreviewHtml(): string
-        {
-                $preview_id = 'b3-mermaid-preview-' . md5(uniqid('', true));
-                $mermaid_src = $this->getMermaidAssetUrl();
+		return $display->getOutput();
+	}
 
-                $preview_id_js = json_encode($preview_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
-                $mermaid_src_js = json_encode($mermaid_src, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+	protected function getMermaidEditorHtml(): string {
+		$prompt_id = 'b3-mermaid-prompt-' . md5(uniqid('', true));
+		$button_id = 'b3-mermaid-generate-' . md5(uniqid('', true));
+		$status_id = 'b3-mermaid-status-' . md5(uniqid('', true));
+		$preview_id = 'b3-mermaid-preview-' . md5(uniqid('', true));
+		$code_id = 'b3-mermaid-code-' . md5(uniqid('', true));
+		$details_id = 'b3-mermaid-details-' . md5(uniqid('', true));
+		$mermaid_src = $this->getMermaidAssetUrl();
+		$ajax_url = $this->getMermaidGenerateUrl();
 
-                return <<<HTML
-<div id="{$preview_id}" style="min-height:120px; padding:1rem; border:1px solid #dcdcdc; background:#fff; overflow:auto;">
-        <div style="color:#777;">Keine Vorschau verfügbar.</div>
+		$prompt_id_js = json_encode($prompt_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+		$button_id_js = json_encode($button_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+		$status_id_js = json_encode($status_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+		$preview_id_js = json_encode($preview_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+		$code_id_js = json_encode($code_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+		$details_id_js = json_encode($details_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+		$mermaid_src_js = json_encode($mermaid_src, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+		$ajax_url_js = json_encode($ajax_url, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+
+		return <<<HTML
+<div style="display:flex; flex-direction:column; gap:1rem;">
+	<div style="display:flex; flex-direction:column; gap:0.5rem;">
+		<label for="{$prompt_id}" style="font-weight:600;">Prompt</label>
+		<textarea
+			id="{$prompt_id}"
+			rows="4"
+			placeholder="Describe the Mermaid diagram to generate"
+			style="width:100%; box-sizing:border-box; resize:vertical;"
+		></textarea>
+		<div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+			<button type="button" class="btn btn-default" id="{$button_id}">Generate Mermaid</button>
+			<div id="{$status_id}" style="color:#666;"></div>
+		</div>
+	</div>
+
+	<div style="display:flex; flex-direction:column; gap:0.5rem;">
+		<div style="font-weight:600;">Preview</div>
+		<div id="{$preview_id}" style="min-height:180px; padding:1rem; border:1px solid #dcdcdc; background:#fff; overflow:auto;">
+			<div style="color:#777;">No preview available.</div>
+		</div>
+	</div>
+
+	<details id="{$details_id}">
+		<summary style="cursor:pointer; font-weight:600;">Advanced: Mermaid code</summary>
+		<div style="margin-top:0.75rem;">
+			<textarea
+				id="{$code_id}"
+				rows="14"
+				spellcheck="false"
+				style="width:100%; box-sizing:border-box; font-family:monospace; resize:vertical;"
+			></textarea>
+		</div>
+	</details>
 </div>
 
 <script>
 (function() {
-        const previewId = {$preview_id_js};
-        const mermaidSrc = {$mermaid_src_js};
-        let renderTimer = null;
+	const promptId = {$prompt_id_js};
+	const buttonId = {$button_id_js};
+	const statusId = {$status_id_js};
+	const previewId = {$preview_id_js};
+	const codeId = {$code_id_js};
+	const detailsId = {$details_id_js};
+	const mermaidSrc = {$mermaid_src_js};
+	const ajaxUrl = {$ajax_url_js};
 
-        function getTextarea() {
-                return document.querySelector('textarea[name="mermaid_src"], textarea[id*="mermaid_src"]');
-        }
+	let renderTimer = null;
 
-        function sleep(ms) {
-                return new Promise(function(resolve) {
-                        window.setTimeout(resolve, ms);
-                });
-        }
+	function getSourceTextarea() {
+		return document.querySelector('textarea[name="mermaid_src"], textarea[id*="mermaid_src"]');
+	}
 
-        function normalizeMermaid(candidate) {
-                if (!candidate) {
-                        return null;
-                }
+	function getPromptTextarea() {
+		return document.getElementById(promptId);
+	}
 
-                if (
-                        typeof candidate.initialize === 'function' ||
-                        typeof candidate.run === 'function' ||
-                        typeof candidate.render === 'function'
-                ) {
-                        return candidate;
-                }
+	function getButton() {
+		return document.getElementById(buttonId);
+	}
 
-                if (candidate.default) {
-                        return normalizeMermaid(candidate.default);
-                }
+	function getStatus() {
+		return document.getElementById(statusId);
+	}
 
-                if (candidate.mermaid) {
-                        return normalizeMermaid(candidate.mermaid);
-                }
+	function getPreviewHost() {
+		return document.getElementById(previewId);
+	}
 
-                return null;
-        }
+	function getCodeTextarea() {
+		return document.getElementById(codeId);
+	}
 
-        async function ensureMermaid() {
-                const existing = normalizeMermaid(window.mermaid);
-                if (existing) {
-                        return existing;
-                }
+	function getDetails() {
+		return document.getElementById(detailsId);
+	}
 
-                if (typeof AssetLoader === 'undefined') {
-                        throw new Error('AssetLoader ist nicht verfügbar');
-                }
+	function setStatus(message, isError) {
+		const status = getStatus();
+		if (!status) {
+			return;
+		}
 
-                if (!window.__b3_mermaid_preview_load_started__) {
-                        window.__b3_mermaid_preview_load_started__ = true;
-                        AssetLoader.loadScript(mermaidSrc);
-                }
+		status.textContent = message || '';
+		status.style.color = isError ? '#b00020' : '#666';
+	}
 
-                const started = Date.now();
+	function findSourceContainer(textarea) {
+		if (!textarea) {
+			return null;
+		}
 
-                while ((Date.now() - started) < 5000) {
-                        const loaded = normalizeMermaid(window.mermaid);
-                        if (loaded) {
-                                return loaded;
-                        }
-                        await sleep(50);
-                }
+		const selectors = [
+			'.form-group',
+			'.control-group',
+			'.ilFormItem',
+			'.c-form__item',
+			'tr'
+		];
 
-                throw new Error('Mermaid wurde nicht geladen');
-        }
+		for (let i = 0; i < selectors.length; i++) {
+			const container = textarea.closest(selectors[i]);
+			if (container) {
+				return container;
+			}
+		}
 
-        async function renderPreview() {
-                const textarea = getTextarea();
-                const host = document.getElementById(previewId);
+		return textarea;
+	}
 
-                if (!textarea || !host) {
-                        return;
-                }
+	function hideSourceField() {
+		const textarea = getSourceTextarea();
+		if (!textarea) {
+			return;
+		}
 
-                const source = textarea.value || '';
-                host.innerHTML = '';
+		const container = findSourceContainer(textarea);
+		if (container) {
+			container.style.display = 'none';
+		}
+	}
 
-                if (!source.trim()) {
-                        host.innerHTML = '<div style="color:#777;">Keine Vorschau verfügbar.</div>';
-                        return;
-                }
+	function sleep(ms) {
+		return new Promise(function(resolve) {
+			window.setTimeout(resolve, ms);
+		});
+	}
 
-                try {
-                        const mermaid = await ensureMermaid();
+	function normalizeMermaid(candidate) {
+		if (!candidate) {
+			return null;
+		}
 
-                        if (!window.__b3_mermaid_initialized__) {
-                                if (typeof mermaid.initialize === 'function') {
-                                        mermaid.initialize({
-                                                startOnLoad: false
-                                        });
-                                } else if (mermaid.mermaidAPI && typeof mermaid.mermaidAPI.initialize === 'function') {
-                                        mermaid.mermaidAPI.initialize({
-                                                startOnLoad: false
-                                        });
-                                }
+		if (
+			typeof candidate.initialize === 'function' ||
+			typeof candidate.run === 'function' ||
+			typeof candidate.render === 'function'
+		) {
+			return candidate;
+		}
 
-                                window.__b3_mermaid_initialized__ = true;
-                        }
+		if (candidate.default) {
+			return normalizeMermaid(candidate.default);
+		}
 
-                        const renderId = 'b3-mermaid-render-' + Date.now();
+		if (candidate.mermaid) {
+			return normalizeMermaid(candidate.mermaid);
+		}
 
-                        if (typeof mermaid.render === 'function') {
-                                const result = await mermaid.render(renderId, source);
-                                host.innerHTML = result.svg || result;
+		return null;
+	}
 
-                                if (result.bindFunctions) {
-                                        result.bindFunctions(host);
-                                }
-                        } else if (typeof mermaid.run === 'function') {
-                                const node = document.createElement('div');
-                                node.className = 'mermaid';
-                                node.textContent = source;
-                                host.appendChild(node);
+	async function ensureMermaid() {
+		const existing = normalizeMermaid(window.mermaid);
+		if (existing) {
+			return existing;
+		}
 
-                                await mermaid.run({
-                                        querySelector: '#' + previewId + ' .mermaid'
-                                });
-                        } else if (mermaid.mermaidAPI && typeof mermaid.mermaidAPI.render === 'function') {
-                                mermaid.mermaidAPI.render(renderId, source, function(svgCode) {
-                                        host.innerHTML = svgCode;
-                                });
-                        } else {
-                                throw new Error('Keine passende Mermaid-Render-API gefunden');
-                        }
-                } catch (e) {
-                        console.error('Mermaid-Preview fehlgeschlagen:', e);
-                        host.innerHTML = '<pre style="white-space:pre-wrap;color:#b00020;">Mermaid-Fehler: '
-                                + (e && e.message ? e.message : e)
-                                + '</pre>';
-                }
-        }
+		if (typeof AssetLoader === 'undefined') {
+			throw new Error('AssetLoader is not available');
+		}
 
-        function scheduleRender() {
-                window.clearTimeout(renderTimer);
-                renderTimer = window.setTimeout(renderPreview, 250);
-        }
+		if (!window.__b3_mermaid_preview_load_started__) {
+			window.__b3_mermaid_preview_load_started__ = true;
+			AssetLoader.loadScript(mermaidSrc);
+		}
 
-        function initPreview() {
-                const textarea = getTextarea();
-                if (!textarea) {
-                        return;
-                }
+		const started = Date.now();
 
-                if (textarea.dataset.b3MermaidPreviewBound !== '1') {
-                        textarea.dataset.b3MermaidPreviewBound = '1';
-                        textarea.addEventListener('input', scheduleRender);
-                        textarea.addEventListener('change', scheduleRender);
-                }
+		while ((Date.now() - started) < 5000) {
+			const loaded = normalizeMermaid(window.mermaid);
+			if (loaded) {
+				return loaded;
+			}
 
-                renderPreview();
-        }
+			await sleep(50);
+		}
 
-        if (document.readyState !== 'loading') {
-                initPreview();
-        } else {
-                document.addEventListener('DOMContentLoaded', initPreview, { once: true });
-        }
+		throw new Error('Mermaid could not be loaded');
+	}
 
-        window.addEventListener('load', initPreview, { once: true });
-        window.addEventListener('mermaid:init', initPreview);
+	function getCurrentMermaid() {
+		const codeTextarea = getCodeTextarea();
+		if (codeTextarea) {
+			return codeTextarea.value || '';
+		}
+
+		const sourceTextarea = getSourceTextarea();
+		if (sourceTextarea) {
+			return sourceTextarea.value || '';
+		}
+
+		return '';
+	}
+
+	function setCurrentMermaid(value) {
+		const normalized = value || '';
+		const sourceTextarea = getSourceTextarea();
+		const codeTextarea = getCodeTextarea();
+
+		if (sourceTextarea) {
+			sourceTextarea.value = normalized;
+		}
+
+		if (codeTextarea && codeTextarea.value !== normalized) {
+			codeTextarea.value = normalized;
+		}
+	}
+
+	async function renderPreview() {
+		const host = getPreviewHost();
+		if (!host) {
+			return;
+		}
+
+		const source = getCurrentMermaid();
+		host.innerHTML = '';
+
+		if (!source.trim()) {
+			host.innerHTML = '<div style="color:#777;">No preview available.</div>';
+			return;
+		}
+
+		try {
+			const mermaid = await ensureMermaid();
+
+			if (!window.__b3_mermaid_initialized__) {
+				if (typeof mermaid.initialize === 'function') {
+					mermaid.initialize({
+						startOnLoad: false
+					});
+				} else if (mermaid.mermaidAPI && typeof mermaid.mermaidAPI.initialize === 'function') {
+					mermaid.mermaidAPI.initialize({
+						startOnLoad: false
+					});
+				}
+
+				window.__b3_mermaid_initialized__ = true;
+			}
+
+			const renderId = 'b3-mermaid-render-' + Date.now();
+
+			if (typeof mermaid.render === 'function') {
+				const result = await mermaid.render(renderId, source);
+				host.innerHTML = result.svg || result;
+
+				if (result.bindFunctions) {
+					result.bindFunctions(host);
+				}
+			} else if (typeof mermaid.run === 'function') {
+				const node = document.createElement('div');
+				node.className = 'mermaid';
+				node.textContent = source;
+				host.appendChild(node);
+
+				await mermaid.run({
+					querySelector: '#' + previewId + ' .mermaid'
+				});
+			} else if (mermaid.mermaidAPI && typeof mermaid.mermaidAPI.render === 'function') {
+				mermaid.mermaidAPI.render(renderId, source, function(svgCode) {
+					host.innerHTML = svgCode;
+				});
+			} else {
+				throw new Error('No compatible Mermaid render API found');
+			}
+		} catch (e) {
+			console.error('Mermaid preview failed:', e);
+			host.innerHTML = '<pre style="white-space:pre-wrap;color:#b00020;">Mermaid error: '
+				+ (e && e.message ? e.message : e)
+				+ '</pre>';
+		}
+	}
+
+	function scheduleRender() {
+		window.clearTimeout(renderTimer);
+		renderTimer = window.setTimeout(renderPreview, 250);
+	}
+
+	function bindCodeEditor() {
+		const codeTextarea = getCodeTextarea();
+		if (!codeTextarea) {
+			return;
+		}
+
+		if (codeTextarea.dataset.b3MermaidCodeBound === '1') {
+			return;
+		}
+
+		codeTextarea.dataset.b3MermaidCodeBound = '1';
+
+		function syncCodeToSource() {
+			setCurrentMermaid(codeTextarea.value || '');
+			scheduleRender();
+		}
+
+		codeTextarea.addEventListener('input', syncCodeToSource);
+		codeTextarea.addEventListener('change', syncCodeToSource);
+	}
+
+	async function generateMermaid() {
+		const promptTextarea = getPromptTextarea();
+		const button = getButton();
+
+		if (!promptTextarea || !button) {
+			return;
+		}
+
+		const prompt = (promptTextarea.value || '').trim();
+		const mermaid = getCurrentMermaid();
+
+		if (!prompt) {
+			setStatus('Please enter a prompt first.', true);
+			promptTextarea.focus();
+			return;
+		}
+
+		button.disabled = true;
+		setStatus('Generating Mermaid ...', false);
+
+		try {
+			const response = await fetch(ajaxUrl, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+					'X-Requested-With': 'XMLHttpRequest'
+				},
+				body: new URLSearchParams({
+					prompt: prompt,
+					mermaid: mermaid
+				}).toString()
+			});
+
+			if (!response.ok) {
+				throw new Error('HTTP ' + response.status);
+			}
+
+			const generatedMermaid = await response.text();
+			setCurrentMermaid(generatedMermaid);
+			scheduleRender();
+
+			const details = getDetails();
+			if (details) {
+				details.open = false;
+			}
+
+			setStatus('Mermaid updated.', false);
+		} catch (e) {
+			console.error('Mermaid generation failed:', e);
+			setStatus('Generation failed: ' + (e && e.message ? e.message : e), true);
+		} finally {
+			button.disabled = false;
+		}
+	}
+
+	function bindGenerator() {
+		const button = getButton();
+		const promptTextarea = getPromptTextarea();
+
+		if (button && button.dataset.b3MermaidGeneratorBound !== '1') {
+			button.dataset.b3MermaidGeneratorBound = '1';
+			button.addEventListener('click', generateMermaid);
+		}
+
+		if (promptTextarea && promptTextarea.dataset.b3MermaidPromptBound !== '1') {
+			promptTextarea.dataset.b3MermaidPromptBound = '1';
+			promptTextarea.addEventListener('keydown', function(event) {
+				if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+					event.preventDefault();
+					generateMermaid();
+				}
+			});
+		}
+	}
+
+	function initEditor() {
+		const sourceTextarea = getSourceTextarea();
+		const codeTextarea = getCodeTextarea();
+
+		if (!sourceTextarea || !codeTextarea) {
+			return;
+		}
+
+		hideSourceField();
+		codeTextarea.value = sourceTextarea.value || '';
+		bindCodeEditor();
+		bindGenerator();
+		renderPreview();
+	}
+
+	if (document.readyState !== 'loading') {
+		initEditor();
+	} else {
+		document.addEventListener('DOMContentLoaded', initEditor, { once: true });
+	}
+
+	window.addEventListener('load', initEditor, { once: true });
+	window.addEventListener('mermaid:init', initEditor);
 })();
 </script>
 HTML;
-        }
+	}
 
-        protected function getMermaidAssetUrl(): string
-        {
-/*
-		$resolvers = $this->classmap->getInstances([
-                        'interface' => IAssetResolver::class
-                ]);
+	protected function getMermaidGenerateUrl(): string {
+		$ctrl = $GLOBALS['DIC']->ctrl();
 
-                if (!empty($resolvers) && method_exists($resolvers[0], 'resolve')) {
-                        return (string) $resolvers[0]->resolve('plugin/Mermaid/assets/mermaid/mermaid.min.js');
-                }
- */
-                return 'components/Base3/Mermaid/mermaid/mermaid.min.js';
-        }
+		return $ctrl->getLinkTargetByClass(
+			['ilUIPluginRouterGUI', 'ilBase3MermaidPageComponentAjaxGUI'],
+			'generate',
+			'',
+			true
+		);
+	}
+
+	protected function getMermaidAssetUrl(): string {
+		return 'components/Base3/Mermaid/mermaid/mermaid.min.js';
+	}
 }
