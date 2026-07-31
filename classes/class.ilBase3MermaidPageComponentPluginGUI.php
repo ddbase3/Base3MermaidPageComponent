@@ -8,6 +8,8 @@ use Base3\Base3Ilias\PageComponent\AbstractPageComponentPluginGUI;
  */
 class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGUI {
 
+	private const MERMAID_STORAGE_PREFIX = 'base64:';
+
 	protected function getPageComponentName(): string {
 		return 'BASE3 Mermaid';
 	}
@@ -18,15 +20,14 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
 
 	protected function getDefaultProps(): array {
 		return [
-			'mermaid_src' => '',
-			'mermaid' => ''
+			'mermaid_src' => ''
 		];
 	}
 
 	protected function setFormContent(ilPropertyFormGUI $form, array $props): void {
 		$this->mainTemplate->addJavaScript('components/Base3/ClientStack/assetloader/assetloader.min.js');
 
-		$value = (string) ($props['mermaid_src'] ?? $props['mermaid'] ?? '');
+		$value = $this->decodeMermaidProperty($this->getMermaidProperty($props));
 
 		$mermaid = new ilTextAreaInputGUI('Mermaid Source', 'mermaid_src');
 		$mermaid->setValue($value);
@@ -50,12 +51,68 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
 			return 'Display not found.';
 		}
 
+		$source = $this->decodeMermaidProperty($this->getMermaidProperty($a_properties));
+
 		$display = $displays[0];
 		$display->setData([
-			'mermaid' => (string) ($a_properties['mermaid_src'] ?? $a_properties['mermaid'] ?? '')
+			'mermaid' => $source
 		]);
 
 		return $display->getOutput();
+	}
+
+	protected function beforeCreateElement(ilPropertyFormGUI $form, array &$props): bool {
+		$props['mermaid_src'] = $this->encodeMermaidProperty(
+			(string) ($props['mermaid_src'] ?? '')
+		);
+
+		return true;
+	}
+
+	protected function beforeUpdateElement(ilPropertyFormGUI $form, array &$props): bool {
+		$props['mermaid_src'] = $this->encodeMermaidProperty(
+			(string) ($props['mermaid_src'] ?? '')
+		);
+
+		return true;
+	}
+
+	private function getMermaidProperty(array $properties): string {
+		$source = (string) ($properties['mermaid_src'] ?? '');
+
+		if ($source === '') {
+			$source = (string) ($properties['mermaid'] ?? '');
+		}
+
+		return $source;
+	}
+
+	private function encodeMermaidProperty(string $source): string {
+		$source = str_replace(["\r\n", "\r"], "\n", $source);
+
+		return self::MERMAID_STORAGE_PREFIX . base64_encode($source);
+	}
+
+	private function decodeMermaidProperty(string $source): string {
+		$source = html_entity_decode($source, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+		if (str_starts_with($source, self::MERMAID_STORAGE_PREFIX)) {
+			$decoded = base64_decode(substr($source, strlen(self::MERMAID_STORAGE_PREFIX)), true);
+
+			if ($decoded === false) {
+				throw new RuntimeException('Invalid encoded Mermaid source.');
+			}
+
+			$source = $decoded;
+		} else {
+			$source = str_ireplace(
+				['&#13;', '&#x0d;', '&#xd;', '&#10;', '&#x0a;', '&#xa;'],
+				["\r", "\r", "\r", "\n", "\n", "\n"],
+				$source
+			);
+		}
+
+		return str_replace(["\r\n", "\r"], "\n", $source);
 	}
 
 	protected function getMermaidEditorHtml(): string {
@@ -65,6 +122,7 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
 		$preview_id = 'b3-mermaid-preview-' . md5(uniqid('', true));
 		$code_id = 'b3-mermaid-code-' . md5(uniqid('', true));
 		$details_id = 'b3-mermaid-details-' . md5(uniqid('', true));
+		$conversation_channel_id = 'mermaid-page-component:' . md5(uniqid('', true));
 		$mermaid_src = $this->getMermaidAssetUrl();
 		$ajax_url = $this->getMermaidGenerateUrl();
 
@@ -74,6 +132,7 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
 		$preview_id_js = json_encode($preview_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
 		$code_id_js = json_encode($code_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
 		$details_id_js = json_encode($details_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+		$conversation_channel_id_js = json_encode($conversation_channel_id, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
 		$mermaid_src_js = json_encode($mermaid_src, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
 		$ajax_url_js = json_encode($ajax_url, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
 
@@ -121,6 +180,7 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
 	const previewId = {$preview_id_js};
 	const codeId = {$code_id_js};
 	const detailsId = {$details_id_js};
+	const conversationChannelId = {$conversation_channel_id_js};
 	const mermaidSrc = {$mermaid_src_js};
 	const ajaxUrl = {$ajax_url_js};
 
@@ -405,15 +465,18 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
 				},
 				body: new URLSearchParams({
 					prompt: prompt,
-					mermaid: mermaid
+					mermaid: mermaid,
+					conversation_channel_id: conversationChannelId
 				}).toString()
 			});
 
+			const responseText = await response.text();
+
 			if (!response.ok) {
-				throw new Error('HTTP ' + response.status);
+				throw new Error(responseText.trim() || ('HTTP ' + response.status));
 			}
 
-			const generatedMermaid = await response.text();
+			const generatedMermaid = responseText;
 			setCurrentMermaid(generatedMermaid);
 			scheduleRender();
 
@@ -491,6 +554,6 @@ HTML;
 	}
 
 	protected function getMermaidAssetUrl(): string {
-		return 'components/Base3/Mermaid/mermaid/mermaid.min.js';
+		return 'components/Base3/ClientStack/mermaid/mermaid.min.js';
 	}
 }

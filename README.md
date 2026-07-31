@@ -1,6 +1,6 @@
 # Base3MermaidPageComponent
 
-Base3MermaidPageComponent provides Mermaid diagram creation as an ILIAS Page Component. It enables users to create Mermaid diagrams with support from an AI agent based on the BASE3 MissionBay agent system and embed them directly into ILIAS content pages where Page Components are supported.
+Base3MermaidPageComponent provides Mermaid diagram creation as an ILIAS Page Component. It enables users to create Mermaid diagrams with support from a configured BASE3 agent and embed them directly into ILIAS content pages where Page Components are supported.
 
 The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
 "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL"
@@ -35,6 +35,25 @@ After copying the plugin files, the plugin MUST be installed and activated in th
 
 ## BASE3 Framework Dependency
 
-This plugin is only runnable in connection with the BASE3 Framework, the BaseIlias integration, the corresponding dependent BASE3 components, and the Base3IliasAdapter UIHook plugin.
+This plugin is only runnable in connection with the BASE3 Framework, the BaseIlias integration, ClientStack, AssistantFoundation, AssistantRuntime, a configured agent runtime, the corresponding dependent BASE3 components, and the Base3IliasAdapter UIHook plugin.
+
+ClientStack provides both the `mermaiddisplay` implementation and the local `mermaid.min.js` browser bundle. A separate Mermaid BASE3 plugin is not required.
 
 These dependencies MUST be installed, configured, and active before this plugin can be used productively.
+
+## Configured Mermaid agent
+
+AI generation uses the configured BASE3 agent stored under:
+
+```text
+agent/mermaid-agent
+```
+
+The Page Component does not define an agent runtime, provider, model, flow,
+memory, or tool configuration. These choices belong to the configured agent.
+The agent should be enabled and instructed to return only complete Mermaid
+source without Markdown fences or explanatory text.
+
+Each editor instance supplies its own `conversation_channel_id`. This allows a
+configured memory profile to work without sharing conversation history between
+simultaneously opened Mermaid editors.
