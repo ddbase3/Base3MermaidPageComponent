@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use Base3\Api\IAssetResolver;
 use Base3\Api\IDisplay;
 use Base3\Base3Ilias\PageComponent\AbstractPageComponentPluginGUI;
 
@@ -25,7 +26,9 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
 	}
 
 	protected function setFormContent(ilPropertyFormGUI $form, array $props): void {
-		$this->mainTemplate->addJavaScript('components/Base3/ClientStack/assetloader/assetloader.min.js');
+		$this->mainTemplate->addJavaScript(
+			$this->dic[IAssetResolver::class]->resolve('plugin/ClientStack/assets/assetloader/assetloader.min.js')
+		);
 
 		$value = $this->decodeMermaidProperty($this->getMermaidProperty($props));
 
@@ -40,7 +43,9 @@ class ilBase3MermaidPageComponentPluginGUI extends AbstractPageComponentPluginGU
 	}
 
 	protected function getPresentationHtml(array $a_properties, string $plugin_version): string {
-		$this->mainTemplate->addJavaScript('components/Base3/ClientStack/assetloader/assetloader.min.js');
+		$this->mainTemplate->addJavaScript(
+			$this->dic[IAssetResolver::class]->resolve('plugin/ClientStack/assets/assetloader/assetloader.min.js')
+		);
 
 		$displays = $this->classmap->getInstances([
 			'interface' => IDisplay::class,
@@ -554,6 +559,6 @@ HTML;
 	}
 
 	protected function getMermaidAssetUrl(): string {
-		return 'components/Base3/ClientStack/mermaid/mermaid.min.js';
+		return $this->dic[IAssetResolver::class]->resolve('plugin/ClientStack/assets/mermaid/mermaid.min.js');
 	}
 }
