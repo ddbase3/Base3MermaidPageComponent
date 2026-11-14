@@ -1,9 +1,9 @@
 <?php declare(strict_types=1);
 
-use AssistantFoundation\Api\IAgentExecutionService;
-use AssistantFoundation\Dto\AgentExecutionRequest;
+use Base3\AssistantFoundation\Api\IAgentExecutionService;
+use Base3\AssistantFoundation\Dto\AgentExecutionRequest;
 use Base3\Core\ServiceLocator;
-use Base3\Settings\Api\ISettingsStore;
+use Base3\CoreFoundation\Settings\Api\ISettingsStore;
 
 /**
  * @ilCtrl_IsCalledBy ilBase3MermaidPageComponentAjaxGUI: ilUIPluginRouterGUI

@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
-use Base3\Api\IAssetResolver;
-use Base3\Api\IDisplay;
+use Base3\CoreFoundation\Api\IAssetResolver;
+use Base3\CoreFoundation\Api\IDisplay;
 use Base3\Base3Ilias\PageComponent\AbstractPageComponentPluginGUI;
 
 /**

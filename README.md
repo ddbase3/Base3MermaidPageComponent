@@ -35,7 +35,7 @@ After copying the plugin files, the plugin MUST be installed and activated in th
 
 ## BASE3 Framework Dependency
 
-This plugin is only runnable in connection with the BASE3 Framework, the BaseIlias integration, ClientStack, AssistantFoundation, AssistantRuntime, a configured agent runtime, the corresponding dependent BASE3 components, and the Base3IliasAdapter UIHook plugin.
+This plugin is only runnable in connection with the BASE3 Framework, the Base3Ilias integration, ClientStack, AssistantFoundation, AssistantRuntime, a configured agent runtime, the corresponding dependent BASE3 components, and the Base3IliasAdapter UIHook plugin.
 
 ClientStack provides both the `mermaiddisplay` implementation and the local `mermaid.min.js` browser bundle. A separate Mermaid BASE3 plugin is not required.
 
